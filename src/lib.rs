@@ -151,4 +151,8 @@ fn structs_with_functions() {
     assert!(p("{f: (fn {} -> number) g: (fn {} -> number)}") < p("{f: (fn {b: boolean} -> number) g: (fn {} -> number)}"));
     assert!(p("{f: (fn {} -> number) g: (fn {} -> number)}") < p("{f: (fn {} -> number) g: (fn {b: boolean} -> number)}"));
     assert!(p("{f: (fn {} -> number) g: (fn {} -> number)}") < p("{f: (fn {b: boolean} -> number) g: (fn {b: boolean} -> number)}"));
+
+    assert!(p("{f: (fn {b: boolean} -> number) g: (fn {} -> number)}") > p("{f: (fn {} -> number) g: (fn {} -> number)}"));
+    assert!(p("{f: (fn {} -> number) g: (fn {b: boolean} -> number)}") > p("{f: (fn {} -> number) g: (fn {} -> number)}"));
+    assert!(p("{f: (fn {b: boolean} -> number) g: (fn {b: boolean} -> number)}") > p("{f: (fn {} -> number) g: (fn {} -> number)}"));
 }
