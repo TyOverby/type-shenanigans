@@ -86,7 +86,7 @@ pub fn trx(sexpr: &Sexpr<StrTendril>) -> Result<Type, Vec<Error<StrTendril>>> {
                 Err(vec![error])
             } else {
                 match &children[0] {
-                    &Sexpr::Terminal(ref token, ref span) if &*token.string == "function" => {
+                    &Sexpr::Terminal(ref token, ref span) if &*token.string == "fn" => {
                         let rest = &children[1..];
                         parse_function_body(rest, span)
                     }
@@ -186,7 +186,7 @@ fn parse_number() {
 
 #[test]
 fn number_to_boolean() {
-    assert_eq!(parse("(function number -> boolean)"),
+    assert_eq!(parse("(fn number -> boolean)"),
                vec![Type::Function {
                         arg: Box::new(Type::Number),
                         ret: Box::new(Type::Boolean),
@@ -195,7 +195,7 @@ fn number_to_boolean() {
 
 #[test]
 fn more_complex_function() {
-    assert_eq!(parse("(function number number -> boolean)"),
+    assert_eq!(parse("(fn number number -> boolean)"),
                vec![Type::Function {
                         arg: Box::new(Type::Number),
                         ret: Box::new(Type::Function {
