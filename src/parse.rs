@@ -3,7 +3,7 @@ use snoot::Sexpr;
 use snoot::parse::Span;
 use snoot::token::{ListType, TokenType};
 use snoot::diagnostic::DiagnosticBag;
-use super::{Type, FunctionType};
+use super::{Type, FunctionType, RecordType};
 
 use std::collections::HashMap;
 
@@ -57,7 +57,7 @@ pub fn trx(sexpr: &Sexpr) -> Result<Type, DiagnosticBag> {
                     }
                 }
                 if errors.is_empty() {
-                    Ok(Type::Structure { fields: builder })
+                    Ok(Type::Record(RecordType::Record{ fields: builder }))
                 } else {
                     Err(errors)
                 }
@@ -183,9 +183,9 @@ fn more_complex_function() {
 
 #[test]
 fn basic_struct() {
-    assert_eq!(parse("{}"), vec![Type::Structure{ fields: HashMap::new() }]);
-    assert_eq!(parse("{a: boolean}"), vec![Type::Structure{ fields: vec![("a".into(), Type::Boolean)].into_iter().collect() }]);
-    assert_eq!(parse("{a: boolean b: number}"), vec![Type::Structure{ fields: vec![("b".into(), Type::Number), ("a".into(), Type::Boolean)].into_iter().collect() }]);
+    assert_eq!(parse("{}"), vec![Type::Record(RecordType::Record{ fields: HashMap::new() })]);
+    assert_eq!(parse("{a: boolean}"), vec![Type::Record(RecordType::Record{ fields: vec![("a".into(), Type::Boolean)].into_iter().collect() })]);
+    assert_eq!(parse("{a: boolean b: number}"), vec![Type::Record(RecordType::Record{ fields: vec![("b".into(), Type::Number), ("a".into(), Type::Boolean)].into_iter().collect() })]);
 }
 
 #[test]

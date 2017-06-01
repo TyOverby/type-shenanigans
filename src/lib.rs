@@ -4,14 +4,14 @@ extern crate tendril;
 
 pub mod parse;
 
+use snoot::diagnostic::DiagnosticBag;
 use std::cmp::Ordering;
-
 use std::collections::HashMap;
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum FunctionType {
-    Union(Box<FunctionType>),
-    Intersection(Box<FunctionType>),
+    Union(Box<FunctionType>, Box<FunctionType>),
+    Intersection(Box<FunctionType>, Box<FunctionType>),
     Function {
         arg: Box<Type>,
         ret: Box<Type>,
@@ -19,22 +19,35 @@ pub enum FunctionType {
 }
 
 #[derive(Eq, PartialEq, Debug)]
-pub enum Type {
-    Function(FunctionType),
-    Structure {
+pub enum RecordType {
+    Union(Box<RecordType>, Box<RecordType>),
+    Intersection(Box<RecordType>, Box<RecordType>),
+    Record {
         fields: HashMap<String, Type>
     },
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub enum Type {
+    Error {
+        diagnostics: DiagnosticBag,
+        contained_types: Vec<Type>
+    },
+    Function(FunctionType),
+    Record(RecordType),
     Boolean,
     Number,
 }
 
-impl PartialOrd for Type {
-    fn partial_cmp(&self, other: &Type) -> Option<Ordering> {
+impl PartialOrd for FunctionType {
+    fn partial_cmp(&self, other: &FunctionType) -> Option<Ordering> {
+        use FunctionType::*;
         match (self, other) {
-            (&Type::Number, &Type::Number) => Some(Ordering::Equal),
-            (&Type::Boolean, &Type::Boolean) => Some(Ordering::Equal),
-            (&Type::Function(FunctionType::Function{arg: ref a1, ret: ref r1}),
-             &Type::Function(FunctionType::Function{arg: ref a2, ret: ref r2})) => {
+            (&Union(_, _) , _) => unimplemented!(),
+            (_, &Union(_, _)) => unimplemented!(),
+            (&Intersection(_, _), _) => unimplemented!(),
+            (_, &Intersection(_, _)) => unimplemented!(),
+            (&Function{arg: ref a1, ret: ref r1}, &Function{arg: ref a2, ret: ref r2}) => {
                 let (c1, c2) = match (a1.partial_cmp(a2), r1.partial_cmp(r2)) {
                     (None, _) => return None,
                     (_, None) => return None,
@@ -55,7 +68,19 @@ impl PartialOrd for Type {
                     (Ordering::Equal, Ordering::Less) => Some(Ordering::Less),
                 }
             }
-            (&Type::Structure {fields: ref f1}, &Type::Structure {fields: ref f2}) => {
+        }
+    }
+}
+
+impl PartialOrd for RecordType {
+    fn partial_cmp(&self, other: &RecordType) -> Option<Ordering> {
+        use RecordType::*;
+        match (self, other) {
+            (&Union(_, _), _) => unimplemented!(),
+            (_, &Union(_, _)) => unimplemented!(),
+            (&Intersection(_, _), _) => unimplemented!(),
+            (_, &Intersection(_, _)) => unimplemented!(),
+            (&RecordType::Record{fields: ref f1}, &RecordType::Record{fields: ref f2}) => {
                 if f1.len() > f2.len() {
                     return other.partial_cmp(self).map(Ordering::reverse);
                 }
@@ -80,7 +105,32 @@ impl PartialOrd for Type {
                     (true, true, _) => None,
                 }
             }
-            (_, _) => None
+        }
+    }
+}
+
+impl PartialOrd for Type {
+    fn partial_cmp(&self, other: &Type) -> Option<Ordering> {
+        match (self, other) {
+            (&Type::Number, &Type::Number) => Some(Ordering::Equal),
+            (&Type::Boolean, &Type::Boolean) => Some(Ordering::Equal),
+            (&Type::Function(ref f1), &Type::Function(ref f2)) => f1.partial_cmp(f2),
+            (&Type::Record(ref r1), &Type::Record(ref r2)) => r1.partial_cmp(r2),
+
+            (&Type::Error{..}, _) => None,
+            (_, &Type::Error{..}) => None,
+            (&Type::Boolean, &Type::Number) => None,
+            (&Type::Number, &Type::Boolean) => None,
+            (&Type::Number, &Type::Function(_)) => None,
+            (&Type::Function(_), &Type::Number) => None,
+            (&Type::Boolean, &Type::Function(_)) => None,
+            (&Type::Function(_), &Type::Boolean) => None,
+            (&Type::Function(_), &Type::Record(_)) => None,
+            (&Type::Record(_), &Type::Function(_)) => None,
+            (&Type::Boolean, &Type::Record(_)) => None,
+            (&Type::Record(_), &Type::Boolean) => None,
+            (&Type::Number, &Type::Record(_)) => None,
+            (&Type::Record(_), &Type::Number) => None,
         }
     }
 }
