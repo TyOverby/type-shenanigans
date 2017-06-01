@@ -3,7 +3,7 @@ use snoot::Sexpr;
 use snoot::parse::Span;
 use snoot::token::{ListType, TokenType};
 use snoot::diagnostic::DiagnosticBag;
-use super::Type;
+use super::{Type, FunctionType};
 
 use std::collections::HashMap;
 
@@ -134,18 +134,18 @@ fn parse_function_body<'a>(bodies: &[Sexpr],
                     return Err(DiagnosticBag::singleton(diagnostic!(span, "expected -> found {}", span.text())));
                 }
             }
-            Ok(Type::Function {
+            Ok(Type::Function(FunctionType::Function {
                 arg: Box::new(arg),
                 ret: Box::new(ret),
-            })
+            }))
         }
         _ => {
             let arg = trx(&bodies[0])?;
             let ret = parse_function_body(&bodies[1..], span)?;
-            Ok(Type::Function {
+            Ok(Type::Function(FunctionType::Function {
                 arg: Box::new(arg),
                 ret: Box::new(ret),
-            })
+            }))
         }
     }
 }
@@ -163,22 +163,22 @@ fn parse_number() {
 #[test]
 fn number_to_boolean() {
     assert_eq!(parse("(fn number -> boolean)"),
-               vec![Type::Function {
+               vec![Type::Function(FunctionType::Function{
                         arg: Box::new(Type::Number),
                         ret: Box::new(Type::Boolean),
-                    }]);
+                    })]);
 }
 
 #[test]
 fn more_complex_function() {
     assert_eq!(parse("(fn number number -> boolean)"),
-               vec![Type::Function {
+               vec![Type::Function(FunctionType::Function {
                         arg: Box::new(Type::Number),
-                        ret: Box::new(Type::Function {
+                        ret: Box::new(Type::Function(FunctionType::Function{
                             arg: Box::new(Type::Number),
                             ret: Box::new(Type::Boolean),
-                        }),
-                    }]);
+                        })),
+                    })]);
 }
 
 #[test]

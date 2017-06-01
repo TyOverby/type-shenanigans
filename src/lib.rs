@@ -8,7 +8,7 @@ use std::cmp::Ordering;
 
 use std::collections::HashMap;
 
-/*
+#[derive(Eq, PartialEq, Debug)]
 pub enum FunctionType {
     Union(Box<FunctionType>),
     Intersection(Box<FunctionType>),
@@ -16,14 +16,11 @@ pub enum FunctionType {
         arg: Box<Type>,
         ret: Box<Type>,
     }
-}*/
+}
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum Type {
-    Function {
-        arg: Box<Type>,
-        ret: Box<Type>,
-    },
+    Function(FunctionType),
     Structure {
         fields: HashMap<String, Type>
     },
@@ -36,7 +33,8 @@ impl PartialOrd for Type {
         match (self, other) {
             (&Type::Number, &Type::Number) => Some(Ordering::Equal),
             (&Type::Boolean, &Type::Boolean) => Some(Ordering::Equal),
-            (&Type::Function{arg: ref a1, ret: ref r1}, &Type::Function{arg: ref a2, ret: ref r2}) => {
+            (&Type::Function(FunctionType::Function{arg: ref a1, ret: ref r1}),
+             &Type::Function(FunctionType::Function{arg: ref a2, ret: ref r2})) => {
                 let (c1, c2) = match (a1.partial_cmp(a2), r1.partial_cmp(r2)) {
                     (None, _) => return None,
                     (_, None) => return None,
