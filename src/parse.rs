@@ -23,6 +23,12 @@ pub fn parse(text: &str) -> Vec<Type> {
     out
 }
 
+pub fn parse_one(text: &str) -> Type {
+    let out = parse(text);
+    assert!(out.len() == 1);
+    out.into_iter().next().unwrap()
+}
+
 pub fn trx(sexpr: &Sexpr) -> Result<Type, DiagnosticBag> {
     match sexpr {
         &Sexpr::Terminal(_, ref span) => {
@@ -68,10 +74,12 @@ pub fn trx(sexpr: &Sexpr) -> Result<Type, DiagnosticBag> {
                 Err(DiagnosticBag::singleton(diagnostic!(span, "what are you doing with this empty list")))
             } else {
                 match &children[0] {
-                    &Sexpr::Terminal(_, ref span) if &*span.text() == "fn" => {
-                        let rest = &children[1..];
-                        parse_function_body(rest, span)
-                    }
+                    &Sexpr::Terminal(_, ref span) if &*span.text() == "union" =>
+                        parse_union(&children[1..], span),
+                    &Sexpr::Terminal(_, ref span) if &*span.text() == "intersect" =>
+                        parse_intersection(&children[1..], span),
+                    &Sexpr::Terminal(_, ref span) if &*span.text() == "fn" =>
+                        parse_function_body(&children[1..], span),
                     other => {
                         Err(DiagnosticBag::singleton(diagnostic!(other.span(), "{} unexpected", other.span().text())))
                     }
@@ -119,7 +127,43 @@ fn parse_field<'a>(name: &Sexpr, colon: &Sexpr, typ: &Sexpr) -> Result<(String, 
     Ok((name, typ))
 }
 
-fn parse_function_body<'a>(bodies: &[Sexpr],
+fn parse_union(bodies: &[Sexpr], span: &Span) -> Result<Type, DiagnosticBag> {
+    match bodies.len() {
+        0 | 1 => {
+            Err(DiagnosticBag::singleton(diagnostic!(span, "union with {} members", bodies.len())))
+        }
+        2 => {
+            let left = trx(&bodies[0])?;
+            let right = trx(&bodies[1])?;
+            Ok(left.union_with(right))
+        }
+        _ => {
+            let left = trx(&bodies[0])?;
+            let right = parse_union(&bodies[1..], span)?;
+            Ok(left.union_with(right))
+        }
+    }
+}
+
+fn parse_intersection(bodies: &[Sexpr], span: &Span) -> Result<Type, DiagnosticBag> {
+    match bodies.len() {
+        0 | 1 => {
+            Err(DiagnosticBag::singleton(diagnostic!(span, "intersection with {} members", bodies.len())))
+        }
+        2 => {
+            let left = trx(&bodies[0])?;
+            let right = trx(&bodies[1])?;
+            Ok(left.intersect_with(right))
+        }
+        _ => {
+            let left = trx(&bodies[0])?;
+            let right = parse_intersection(&bodies[1..], span)?;
+            Ok(left.intersect_with(right))
+        }
+    }
+}
+
+fn parse_function_body(bodies: &[Sexpr],
                            span: &Span)
                            -> Result<Type, DiagnosticBag> {
     match bodies.len() {
@@ -186,6 +230,20 @@ fn basic_struct() {
     assert_eq!(parse("{}"), vec![Type::Record(RecordType::Record{ fields: HashMap::new() })]);
     assert_eq!(parse("{a: boolean}"), vec![Type::Record(RecordType::Record{ fields: vec![("a".into(), Type::Boolean)].into_iter().collect() })]);
     assert_eq!(parse("{a: boolean b: number}"), vec![Type::Record(RecordType::Record{ fields: vec![("b".into(), Type::Number), ("a".into(), Type::Boolean)].into_iter().collect() })]);
+}
+
+#[test]
+fn test_struct_union() {
+    assert_eq!(
+        parse_one("(union {a: number} {b: boolean})"),
+        parse_one("{a: number}").union_with(parse_one("{b: boolean}")))
+}
+
+#[test]
+fn test_struct_intersection() {
+    assert_eq!(
+        parse_one("(intersect {a: number} {b: boolean})"),
+        parse_one("{a: number}").intersect_with(parse_one("{b: boolean}")))
 }
 
 #[test]

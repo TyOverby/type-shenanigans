@@ -31,7 +31,6 @@ pub enum RecordType {
 pub enum Type {
     Error {
         diagnostics: DiagnosticBag,
-        contained_types: Vec<Type>
     },
     Function(FunctionType),
     Record(RecordType),
@@ -135,6 +134,66 @@ impl PartialOrd for Type {
     }
 }
 
+impl Type {
+    fn name(&self) -> &'static str {
+        match *self {
+            Type::Boolean => "boolean",
+            Type::Number => "number",
+            Type::Error{..} => "error",
+            Type::Function(FunctionType::Function{..}) => "function",
+            Type::Function(FunctionType::Union(_, _)) => "function-union",
+            Type::Function(FunctionType::Intersection(_, _)) => "function-intersection",
+            Type::Record(RecordType::Record{..}) => "record",
+            Type::Record(RecordType::Union(_, _)) => "record-union",
+            Type::Record(RecordType::Intersection(_, _)) => "record-intersection",
+        }
+    }
+
+    fn union_with(self, other: Type) -> Type {
+        match (self, other) {
+            (Type::Function(a), Type::Function(b)) =>
+                Type::Function(FunctionType::Union(Box::new(a), Box::new(b))),
+            (Type::Record(a), Type::Record(b)) =>
+                Type::Record(RecordType::Union(Box::new(a), Box::new(b))),
+            (Type::Error{diagnostics: mut diagnostics_a}, Type::Error{diagnostics: diagnostics_b}) => {
+                diagnostics_a.append(diagnostics_b);
+                Type::Error{ diagnostics: diagnostics_a }
+            }
+            (error@Type::Error{..}, _) => error,
+            (_, error@Type::Error{..}) => error,
+
+            (a, b) => {
+                Type::Error {
+                    diagnostics: DiagnosticBag::singleton(
+                        diagnostic!(&snoot::parse::Span::empty(),
+                        "can't union types {} and {}", a.name(), b.name()))
+                }
+            }
+        }
+    }
+    fn intersect_with(self, other: Type) -> Type {
+        match (self, other) {
+            (Type::Function(a), Type::Function(b)) =>
+                Type::Function(FunctionType::Intersection(Box::new(a), Box::new(b))),
+            (Type::Record(a), Type::Record(b)) =>
+                Type::Record(RecordType::Intersection(Box::new(a), Box::new(b))),
+            (Type::Error{diagnostics: mut diagnostics_a}, Type::Error{diagnostics: diagnostics_b}) => {
+                diagnostics_a.append(diagnostics_b);
+                Type::Error{ diagnostics: diagnostics_a }
+            }
+            (error@Type::Error{..}, _) => error,
+            (_, error@Type::Error{..}) => error,
+
+            (a, b) => {
+                Type::Error {
+                    diagnostics: DiagnosticBag::singleton(
+                        diagnostic!(&snoot::parse::Span::empty(),
+                        "can't intersect types {} and {}", a.name(), b.name()))
+                }
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 fn p(text: &str) -> Type {
