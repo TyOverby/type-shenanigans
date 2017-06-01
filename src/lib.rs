@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate snoot;
 extern crate tendril;
 
@@ -6,6 +7,16 @@ pub mod parse;
 use std::cmp::Ordering;
 
 use std::collections::HashMap;
+
+/*
+pub enum FunctionType {
+    Union(Box<FunctionType>),
+    Intersection(Box<FunctionType>),
+    Function {
+        arg: Box<Type>,
+        ret: Box<Type>,
+    }
+}*/
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum Type {
@@ -76,8 +87,14 @@ impl PartialOrd for Type {
     }
 }
 
+
 #[cfg(test)]
-use parse::parse as p;
+fn p(text: &str) -> Type {
+    let r = parse::parse(text);
+    assert_eq!(r.len(), 1);
+    r.into_iter().next().unwrap()
+}
+
 
 #[test]
 fn subtyping_basic() {
