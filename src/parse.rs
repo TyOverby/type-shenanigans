@@ -232,19 +232,22 @@ fn basic_struct() {
     assert_eq!(parse("{a: boolean b: number}"), vec![Type::Record(RecordType::Record{ fields: vec![("b".into(), Type::Number), ("a".into(), Type::Boolean)].into_iter().collect() })]);
 }
 
+/*
 #[test]
 fn test_struct_union() {
     assert_eq!(
         parse_one("(union {a: number} {b: boolean})"),
         parse_one("{a: number}").union_with(parse_one("{b: boolean}")))
 }
+*/
 
+/*
 #[test]
 fn test_struct_intersection() {
     assert_eq!(
         parse_one("(intersect {a: number} {b: boolean})"),
         parse_one("{a: number}").intersect_with(parse_one("{b: boolean}")))
-}
+}*/
 
 #[test]
 #[should_panic]

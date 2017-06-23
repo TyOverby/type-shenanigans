@@ -8,7 +8,7 @@ use snoot::diagnostic::DiagnosticBag;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Debug)]
 pub enum FunctionType {
     Union(Box<FunctionType>, Box<FunctionType>),
     Intersection(Box<FunctionType>, Box<FunctionType>),
@@ -18,7 +18,7 @@ pub enum FunctionType {
     }
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Debug)]
 pub enum RecordType {
     Union(Box<RecordType>, Box<RecordType>),
     Intersection(Box<RecordType>, Box<RecordType>),
@@ -27,7 +27,7 @@ pub enum RecordType {
     },
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Type {
     Error {
         diagnostics: DiagnosticBag,
@@ -38,12 +38,42 @@ pub enum Type {
     Number,
 }
 
+fn apply_union<L, R>(l: L, r: R) -> Option<Ordering>
+where L: FnOnce() -> Option<Ordering>, R: FnOnce() -> Option<Ordering> {
+    use Ordering::*;
+    let (l, r) = (l(), r());
+    println!("{:?} {:?}", l, r);
+    let (l, r) = match (l, r) {
+        (None, None) => return None,
+        (None, Some(Less)) | (Some(Less), None) => unimplemented!(),
+        (None, Some(Greater)) | (Some(Greater), None) => unimplemented!(),
+        (None, Some(Equal)) | (Some(Equal), None) => return Some(Greater),
+        (Some(l), Some(r)) => (l, r),
+    };
+
+    match (l, r) {
+        (Equal, Equal) => Some(Equal),
+        (Equal, Less) | (Less, Equal) => Some(Greater),
+        (Equal, Greater) | (Greater, Equal) => Some(Less),
+        (Less, Less) => Some(Greater),
+        (Greater, Greater) => Some(Less),
+        (Less, Greater) | (Greater, Less) => Some(Greater),
+    }
+}
+
+impl PartialEq for FunctionType {
+    fn eq(&self, other: &FunctionType) -> bool {
+        self.partial_cmp(other).map(|a| a == Ordering::Equal).unwrap_or(false)
+    }
+}
+
 impl PartialOrd for FunctionType {
     fn partial_cmp(&self, other: &FunctionType) -> Option<Ordering> {
         use FunctionType::*;
         match (self, other) {
-            (&Union(_, _) , _) => unimplemented!(),
-            (_, &Union(_, _)) => unimplemented!(),
+            (a, &Union(ref left, ref right)) => {
+                apply_union(|| a.partial_cmp(left), || a.partial_cmp(right)),
+            (a@&Union(_, _), b) => b.partial_cmp(a).map(Ordering::reverse),
             (&Intersection(_, _), _) => unimplemented!(),
             (_, &Intersection(_, _)) => unimplemented!(),
             (&Function{arg: ref a1, ret: ref r1}, &Function{arg: ref a2, ret: ref r2}) => {
@@ -71,12 +101,20 @@ impl PartialOrd for FunctionType {
     }
 }
 
+
+impl PartialEq for RecordType{
+    fn eq(&self, other: &RecordType) -> bool {
+        self.partial_cmp(other).map(|a| a == Ordering::Equal).unwrap_or(false)
+    }
+}
+
 impl PartialOrd for RecordType {
     fn partial_cmp(&self, other: &RecordType) -> Option<Ordering> {
         use RecordType::*;
         match (self, other) {
-            (&Union(_, _), _) => unimplemented!(),
-            (_, &Union(_, _)) => unimplemented!(),
+            (a, &Union(ref left, ref right)) =>
+                apply_union(|| a.partial_cmp(left), || a.partial_cmp(right)),
+            (a@&Union(_, _), b) => b.partial_cmp(a).map(Ordering::reverse),
             (&Intersection(_, _), _) => unimplemented!(),
             (_, &Intersection(_, _)) => unimplemented!(),
             (&RecordType::Record{fields: ref f1}, &RecordType::Record{fields: ref f2}) => {
@@ -279,4 +317,25 @@ fn structs_with_functions() {
     assert!(p("{f: (fn {b: boolean} -> number) g: (fn {} -> number)}") > p("{f: (fn {} -> number) g: (fn {} -> number)}"));
     assert!(p("{f: (fn {} -> number) g: (fn {b: boolean} -> number)}") > p("{f: (fn {} -> number) g: (fn {} -> number)}"));
     assert!(p("{f: (fn {b: boolean} -> number) g: (fn {b: boolean} -> number)}") > p("{f: (fn {} -> number) g: (fn {} -> number)}"));
+}
+
+#[test]
+fn union_records() {
+    assert!(p("{}") == p("(union {} {})"));
+    assert!(p("{a:boolean}") > p("(union {a:boolean} {b:number})"));
+    assert!(p("{a:boolean b:number}") > p("(union {a:boolean} {b:number})"));
+    assert!(p("{a:boolean}") < p("(union {a:boolean b: number} {a:boolean c:number})"));
+    assert!(p("{a:boolean b:number}") > p("(union {a:boolean} {a:boolean b:number d:boolean})"));
+    assert!(p("{a:boolean b:number}") > p("(union {a:boolean b:number d:boolean} {a:boolean})"));
+    assert!(p("(union {a:boolean b:number d:boolean} {a:boolean})") < p("{a:boolean b:number}"));
+    assert!(p("{a:boolean}") > p("(union {} {a:boolean})"));
+    assert!(p("{a:boolean}") < p("(union {a:boolean b:number} {a:boolean})"));
+    assert!(p("{a:boolean}") != p("(union {b:number} {c:number})"));
+    assert!(p("(union {a:boolean b:number} {a:boolean c:boolean})") > p("{}"));
+    assert!(p("(union {a:boolean b:number} {a:boolean c:boolean})") > p("{a:boolean}"));
+}
+
+#[test]
+fn union_functions() {
+    assert!(p("(union {a:boolean b:number} {a:boolean c:boolean})") == p("(union {a:boolean b:number} {a:boolean c:boolean})"));
 }
